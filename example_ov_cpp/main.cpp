@@ -307,6 +307,68 @@ int test_chat_with_video_image() {
     return 1;
 }
 
+int test_history_vlm() {
+    std::cout << "== Start test_history_vlm" << std::endl;
+
+	std::vector<std::string> system_message = { "", "You are a helpful assistant." };
+    std::string models_path = "../../modular_genai/composable_pipeline/tests/test_models/qwen2.5-vl-3b-instruct/";
+    std::vector<std::string> attention_backend = { "PA", "SDPA" };
+
+    ov::AnyMap cfg;
+    cfg["ATTENTION_BACKEND"] = attention_backend[0];
+    std::cout << "== Init ov_pipeline, ATTENTION_BACKEND = " << cfg["ATTENTION_BACKEND"].as<std::string>() << std::endl;
+    auto ov_pipe = ov::genai::VLMPipeline(models_path, "CPU", cfg);
+    
+    auto generation_config = ov_pipe.get_generation_config();
+    generation_config.max_new_tokens = 30;
+    generation_config.set_eos_token_id(ov_pipe.get_tokenizer().get_eos_token_id());
+
+    ov::genai::ChatHistory history;
+    if (!system_message[0].empty()) {
+        history.push_back({{"role", "system"}, {"content", system_message[0]}});
+    }
+
+    std::string img_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/cat_120_100.png";
+    std::string img_dog_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/dog_120_120.png";
+    auto img = utils::load_image(img_fn);
+    auto img_dog = utils::load_image(img_dog_fn);
+
+    auto iteration_images = std::vector<std::vector<ov::Tensor>>{{img}, {}, {img_dog}};
+    auto iteration_videos = std::vector<std::vector<ov::Tensor>>{{}, {}, {}};
+    auto questions = std::vector<std::string>{"What is on the image?", "What color is the cat?", "What is the difference between the first image and the last image? Please answer in one sentence."};
+
+    std::cout << "== First ov_pipe.generate" << std::endl;
+    history.push_back({{"role", "user"}, {"content", questions[0]}});
+
+    auto res = ov_pipe.generate(
+        history,
+        ov::genai::images(iteration_images[0]),
+        ov::genai::videos(iteration_videos[0]), ov::genai::generation_config(generation_config)
+    );
+    history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
+    std::cout << "  == idx = " << 0 << std::endl;
+    std::cout << "      Question: " << questions[0] << std::endl;
+    std::cout << "      Response: " << res.texts[0] << std::endl;
+
+    for (size_t idx = 1; idx < iteration_images.size(); idx++) {
+        std::cout << "== idx = " << idx << std::endl;
+        std::cout << "  == iteration_images[idx].size() = " << iteration_images[idx].size() << std::endl;
+        std::cout << "  == iteration_videos[idx - 1].size() = " << iteration_videos[idx - 1].size() << std::endl;
+        history.push_back({{"role", "user"}, {"content", questions[idx]}});
+        res = ov_pipe.generate(
+            history,
+            ov::genai::images(iteration_images[idx]),
+            ov::genai::videos(iteration_videos[idx - 1]),
+            ov::genai::generation_config(generation_config)
+            );
+        history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
+        std::cout << "      Question: " << questions[idx] << std::endl;
+        std::cout << "      Response: " << res.texts[0] << std::endl;
+    }
+    std::cout << "== Done " << std::endl;
+    return 1;
+}
+
 int test_vlm_add_extension() {
     std::cout << "== Start test_vlm_add_extension" << std::endl;
 
@@ -468,11 +530,12 @@ int main(int argc, char *argv[])
 {
     try
     {
-        return test_llm();
+        // return test_llm();
         // return test_llm_lookup(argc, argv);
         // return test_vllm_lookup(argc, argv);
         // return test_cb_add_request_vs_vlm();
         // return test_chat_with_video_image();
+        return test_history_vlm();
         // return test_vlm_add_extension();
         // return test_vllm_eagle3(argc, argv);
         // return test_llm_cdpruner(argc, argv);
