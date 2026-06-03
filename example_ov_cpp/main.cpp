@@ -339,6 +339,7 @@ int test_history_vlm() {
 
     std::cout << "== First ov_pipe.generate" << std::endl;
     history.push_back({{"role", "user"}, {"content", questions[0]}});
+    std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
 
     auto res = ov_pipe.generate(
         history,
@@ -349,6 +350,7 @@ int test_history_vlm() {
     std::cout << "  == idx = " << 0 << std::endl;
     std::cout << "      Question: " << questions[0] << std::endl;
     std::cout << "      Response: " << res.texts[0] << std::endl;
+    // std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
 
     for (size_t idx = 1; idx < iteration_images.size(); idx++) {
         std::cout << "== idx = " << idx << std::endl;
@@ -364,6 +366,7 @@ int test_history_vlm() {
         history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
         std::cout << "      Question: " << questions[idx] << std::endl;
         std::cout << "      Response: " << res.texts[0] << std::endl;
+        // std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
     }
     std::cout << "== Done " << std::endl;
     return 1;

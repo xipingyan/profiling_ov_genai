@@ -64,18 +64,18 @@
             "name": "qwen2vl_app_cpp",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/mnt/xiping/gpu_profiling/profiling_qwen2b_vl_instruction/example_ov_cpp/build/qwen2vl_app_cpp",
+            "program": "/home/xiping/mygithub/profiling_ov_genai/example_ov_cpp/build/qwen2vl_app_cpp",
             "args": [
-                "/mnt/xiping/gpu_profiling/profiling_qwen2b_vl_instruction/models/ov/Qwen2.5-VL-3B-Instruct/INT4/",
+                "/home/xiping/mygithub/profiling_ov_genai/models/ov/Qwen2.5-VL-3B-Instruct/INT4/",
                 // "video",
-                // "/mnt/xiping/gpu_profiling/profiling_qwen2b_vl_instruction/test_video/rsz_video",
+                // "/home/xiping/mygithub/profiling_ov_genai/test_video/rsz_video",
                 "img",
                 "../test_video/home.jpg",
                 "CPU",
                 "prompt.txt"
             ],
             "stopAtEntry": false,
-            "cwd": "/mnt/xiping/gpu_profiling/profiling_qwen2b_vl_instruction/example_ov_cpp",
+            "cwd": "/home/xiping/mygithub/profiling_ov_genai/example_ov_cpp",
             "environment": [
                 // {
                 //     "name": "OPENVINO_LOG_LEVEL",
@@ -85,10 +85,10 @@
                 //     "name": "ENABLE_CUSTOM_VIT",
                 //     "value": "1"
                 // },
-                {
-                    "name": "LOOKUP",
-                    "value": "1"
-                },
+                // {
+                //     "name": "LOOKUP",
+                //     "value": "1"
+                // },
                 {
                     "name": "PA",
                     "value": "1"
