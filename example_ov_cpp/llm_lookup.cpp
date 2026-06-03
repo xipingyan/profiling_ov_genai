@@ -74,11 +74,11 @@ int test_llm_lookup(int argc, char* argv[]) {
     // pipe.get_tokenizer().apply_chat_template(history, true);
 
     for (size_t i = 0;i < 3; i++) {
-        pipe.start_chat();
+        ov::genai::ChatHistory history;
+        history.push_back({{"role", "user"}, {"content", "What is the capital of China?"}});
         auto t1 = std::chrono::high_resolution_clock::now();
-        auto outputs = pipe.generate("What is the capital of China?", config);
+        auto outputs = pipe.generate(history, config);
         auto t2 = std::chrono::high_resolution_clock::now();
-        pipe.finish_chat();
         std::cout << "time:" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms, " << outputs << '\n';
     }
     return 0;

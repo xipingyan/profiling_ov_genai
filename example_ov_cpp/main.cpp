@@ -47,19 +47,21 @@ void test_images(const CTestParam &param, ov::genai::VLMPipeline &pipe, std::vec
     for (int l = 0; l < 1; l++)
     {
         std::cout << "Loop: [" << l << "] " << std::endl;
-        pipe.start_chat();
+        ov::genai::ChatHistory history;
         for (int i = 0; i < prompt_vec.size(); i++)
         {
+            history.push_back({{"role", "user"}, {"content", prompt_vec[i]}});
             auto t1 = std::chrono::high_resolution_clock::now();
-            auto aa = pipe.generate(prompt_vec[i],
+            auto aa = pipe.generate(history,
                                     ov::genai::images(images_vec[i]),
                                     ov::genai::generation_config(generation_config)
                                     // ov::genai::streamer(print_subword)
                                 );
             auto t2 = std::chrono::high_resolution_clock::now();
+            history.push_back({{"role", "assistant"}, {"content", aa.texts[0]}});
             std::cout << "result: text =" << aa.texts[0].c_str() << ", score=" << aa.scores[0] << ", tm=" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
-           
-        } pipe.finish_chat();
+
+        }
     }
 }
 
@@ -79,15 +81,15 @@ void test_video(const CTestParam &param, ov::genai::VLMPipeline &pipe, const std
     std::cout << "  test_video pass 'images' " << std::endl;
     for (int i = 0; i < 1; i++)
     {
-        pipe.start_chat();
+        ov::genai::ChatHistory history;
+        history.push_back({{"role", "user"}, {"content", prompt}});
         std::cout << "  Loop: [" << i << "] ";
         auto t1 = std::chrono::high_resolution_clock::now();
-        auto aa = pipe.generate(prompt,
+        auto aa = pipe.generate(history,
                                 ov::genai::images(rgbs),
                                 ov::genai::generation_config(generation_config));
         auto t2 = std::chrono::high_resolution_clock::now();
         std::cout << ", result: text =" << aa.texts[0].c_str() << ", score=" << aa.scores[0] << ", tm=" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
-        pipe.finish_chat();
     }
 #endif
 
@@ -95,16 +97,16 @@ void test_video(const CTestParam &param, ov::genai::VLMPipeline &pipe, const std
     std::cout << "  test_video pass 'video' with multiple tensors " << std::endl;
     for (int i = 0; i < 1; i++)
     {
-        pipe.start_chat();
+        ov::genai::ChatHistory history;
+        history.push_back({{"role", "user"}, {"content", prompt}});
         std::cout << "  Loop: [" << i << "] ";
         auto t1 = std::chrono::high_resolution_clock::now();
-        auto aa = pipe.generate(prompt,
+        auto aa = pipe.generate(history,
                                 ov::genai::videos(rgbs),
                                 ov::genai::generation_config(generation_config));
         // ov::genai::streamer(print_subword));
         auto t2 = std::chrono::high_resolution_clock::now();
         std::cout << ", result: text =" << aa.texts[0].c_str() << ", score=" << aa.scores[0] << ", tm=" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
-        pipe.finish_chat();
     }
 #endif
 
@@ -112,16 +114,16 @@ void test_video(const CTestParam &param, ov::genai::VLMPipeline &pipe, const std
     std::cout << "  test_video pass 'video' with one tensor " << std::endl;
     for (int i = 0; i < 1; i++)
     {
-        pipe.start_chat();
+        ov::genai::ChatHistory history;
+        history.push_back({{"role", "user"}, {"content", prompt}});
         std::cout << "  Loop: [" << i << "] ";
         auto t1 = std::chrono::high_resolution_clock::now();
-        auto aa = pipe.generate(prompt,
+        auto aa = pipe.generate(history,
                                 ov::genai::videos(std::vector<ov::Tensor>{video}),
                                 ov::genai::generation_config(generation_config));
         // ov::genai::streamer(print_subword));
         auto t2 = std::chrono::high_resolution_clock::now();
         std::cout << ", result: text =" << aa.texts[0].c_str() << ", score=" << aa.scores[0] << ", tm=" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
-        pipe.finish_chat();
     }
 #endif
 
@@ -267,35 +269,40 @@ int test_chat_with_video_image() {
     generation_config.max_new_tokens = 30;
     generation_config.set_eos_token_id(ov_pipe.get_tokenizer().get_eos_token_id());
 
-    std::cout << "== Init ov_pipe.start_chat" << std::endl;
-    ov_pipe.start_chat(system_message[0]);
-
     auto iteration_images = std::vector<std::vector<ov::Tensor>>{{ img }, {}, {}};
     auto iteration_videos = std::vector<std::vector<ov::Tensor>>{{ video },{},{ video }};
 
     auto images = iteration_images[0];
     auto videos = iteration_videos[0];
 
+    ov::genai::ChatHistory history;
+    if (!system_message[0].empty()) {
+        history.push_back({{"role", "system"}, {"content", system_message[0]}});
+    }
+
     std::cout << "== First ov_pipe.generate" << std::endl;
+    history.push_back({{"role", "user"}, {"content", "What is on the image?"}});
     auto res = ov_pipe.generate(
-        "What is on the image?",
-        ov::genai::images(images), 
+        history,
+        ov::genai::images(images),
         ov::genai::videos(videos), ov::genai::generation_config(generation_config)
     );
-      
+    history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
+
     for (size_t idx = 1; idx < iteration_images.size(); idx++) {
         std::cout << "== idx = " << idx << std::endl;
         std::cout << "  == iteration_images[idx].size() = " << iteration_images[idx].size() << std::endl;
         std::cout << "  == iteration_videos[idx - 1].size() = " << iteration_videos[idx - 1].size() << std::endl;
+        history.push_back({{"role", "user"}, {"content", "What is special about this image?"}});
         res = ov_pipe.generate(
-            "What is special about this image?",
+            history,
             ov::genai::images(iteration_images[idx]),
             ov::genai::videos(iteration_videos[idx - 1]),
             ov::genai::generation_config(generation_config)
             );
-        std::cout << "  == idx = " << idx << " finish_chat done." << std::endl;
+        history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
+        std::cout << "  == idx = " << idx << " done." << std::endl;
     }
-    ov_pipe.finish_chat();
     std::cout << "== Done " << std::endl;
     return 1;
 }
@@ -403,25 +410,26 @@ int test_qwen2_5_vl_custom_vit(int argc, char *argv[])
     for (int l = 0; l < 2; l++)
     {
         std::cout << "Loop: [" << l << "] " << std::endl;
-		pipe.start_chat();
+        ov::genai::ChatHistory history;
 		for (int i = 0; i < prompt_vec.size(); i++)
 		{
             if (images_vec[i].size() > 0) {
                 std::cout << "  images_vec[i][0] = " << images_vec[i][0].get_shape() << std::endl;
             }
+            history.push_back({{"role", "user"}, {"content", prompt_vec[i]}});
 			auto t1 = std::chrono::high_resolution_clock::now();
-            auto aa = pipe.generate(prompt_vec[i],
+            auto aa = pipe.generate(history,
                 ov::genai::images(images_vec[i]),
                 ov::genai::generation_config(generation_config));
                 //ov::genai::streamer(print_subword));
 			auto t2 = std::chrono::high_resolution_clock::now();
+            history.push_back({{"role", "assistant"}, {"content", aa.texts[0]}});
 			std::cout << "  == result: " << aa.texts[0].c_str() << std::endl;
             std::cout << "  == score=" << aa.scores[0] << ", tm=" << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
             std::cout << "    == get_prepare_embeddings_duration = " << aa.perf_metrics.get_prepare_embeddings_duration().mean << std::endl;
             std::cout << "    == TTFT = " << aa.perf_metrics.get_ttft().mean << " +- " << aa.perf_metrics.get_ttft().std << std::endl;
             std::cout << "    == TPOT = " << aa.perf_metrics.get_tpot().mean << " +- " << aa.perf_metrics.get_tpot().std << std::endl;
 		}
-		pipe.finish_chat();
     }
     return 0;
 }
