@@ -330,43 +330,39 @@ int test_history_vlm() {
 
     std::string img_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/cat_120_100.png";
     std::string img_dog_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/dog_120_120.png";
+    std::string img_cars_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/cars-1200-674.jpg";
+    
     auto img = utils::load_image(img_fn);
     auto img_dog = utils::load_image(img_dog_fn);
+    auto img_cars = utils::load_image(img_cars_fn);
 
-    auto iteration_images = std::vector<std::vector<ov::Tensor>>{{img}, {}, {img_dog}};
+    auto iteration_images = std::vector<std::vector<ov::Tensor>>{{img}, {img_cars}, {img_dog}};
     auto iteration_videos = std::vector<std::vector<ov::Tensor>>{{}, {}, {}};
-    auto questions = std::vector<std::string>{"What is on the image?", "What color is the cat?", "What is the difference between the first image and the last image? Please answer in one sentence."};
+    auto questions = std::vector<std::string>{"What is on the image?",
+                                              "How many cars in the second image? only answer fix digital in json format: for example {\"count\": 3}",
+                                              "How many images in total? only answer fix digital in json format: for example {\"count\": 3}"};
 
-    std::cout << "== First ov_pipe.generate" << std::endl;
-    history.push_back({{"role", "user"}, {"content", questions[0]}});
-    std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
-
-    auto res = ov_pipe.generate(
-        history,
-        ov::genai::images(iteration_images[0]),
-        ov::genai::videos(iteration_videos[0]), ov::genai::generation_config(generation_config)
-    );
-    history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
-    std::cout << "  == idx = " << 0 << std::endl;
-    std::cout << "      Question: " << questions[0] << std::endl;
-    std::cout << "      Response: " << res.texts[0] << std::endl;
-    // std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
-
-    for (size_t idx = 1; idx < iteration_images.size(); idx++) {
+    std::cout << "== Start ov_pipe.generate:" << std::endl;
+    for (size_t idx = 0; idx < iteration_images.size(); idx++)
+    {
         std::cout << "== idx = " << idx << std::endl;
         std::cout << "  == iteration_images[idx].size() = " << iteration_images[idx].size() << std::endl;
-        std::cout << "  == iteration_videos[idx - 1].size() = " << iteration_videos[idx - 1].size() << std::endl;
+        std::cout << "  == iteration_videos[idx].size() = " << iteration_videos[idx].size() << std::endl;
         history.push_back({{"role", "user"}, {"content", questions[idx]}});
-        res = ov_pipe.generate(
+        auto res = ov_pipe.generate(
             history,
             ov::genai::images(iteration_images[idx]),
-            ov::genai::videos(iteration_videos[idx - 1]),
-            ov::genai::generation_config(generation_config)
-            );
+            ov::genai::videos(iteration_videos[idx]),
+            ov::genai::generation_config(generation_config));
         history.push_back({{"role", "assistant"}, {"content", res.texts[0]}});
         std::cout << "      Question: " << questions[idx] << std::endl;
         std::cout << "      Response: " << res.texts[0] << std::endl;
         // std::cout << "  history: " << history.get_messages().to_json_string(2) << std::endl;
+        if (idx == 1) {
+            history.pop_back();
+            history.pop_back();
+            std::cout << "  After pop_back, history: " << history.get_messages().to_json_string(2) << std::endl;
+        }
     }
     std::cout << "== Done " << std::endl;
     return 1;
