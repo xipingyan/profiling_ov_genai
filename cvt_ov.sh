@@ -25,13 +25,15 @@ model_id='openai/whisper-tiny'
 model_id='OpenVINO/whisper-base-fp16-ov'
 model_id='llmware/speech-t5-tts-ov'
 model_id='OpenVINO/stable-diffusion-v1-5-int8-ov'
+model_id='/home/xiping/mygithub/modular_genai/openvino.mx/tests/test_models/qwen3-vl-2b-instruct'
+model_id='google/gemma-4-12B'
 
 # Refer: https://hf-mirror.com/
 export HF_ENDPOINT=https://hf-mirror.com
-# huggingface-cli download --token [your token] --resume-download $model_id --local-dir $model_id
+hf download --token [your token] $model_id --local-dir ./models/$model_id
 
 # compress to int4
-# optimum-cli export openvino --model $model_id --task image-text-to-text ov/Qwen2.5-VL-3B-Instruct/INT4 --weight-format int4 --trust-remote-code
+# optimum-cli export openvino --model $model_id --task image-text-to-text ov/qwen3-vl-2b-instruct_int4 --weight-format int4 --trust-remote-code
 # optimum-cli export openvino --model $model_id --task video-text-to-text ov/Qwen2-VL-2B-Instruct_video/INT4 --weight-format int4 --trust-remote-code
 
 # model_id='Qwen/Qwen2.5-VL-3B-Instruct'
