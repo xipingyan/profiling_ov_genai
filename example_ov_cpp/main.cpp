@@ -329,18 +329,18 @@ int test_history_vlm() {
     }
 
     std::string img_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/cat_120_100.png";
-    std::string img_dog_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/dog_120_120.png";
     std::string img_cars_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/cars-1200-674.jpg";
+    std::string img_dog_fn = "../../modular_genai/openvino.pipeline.mx/tests/test_data/dog_120_120.png";
     
     auto img = utils::load_image(img_fn);
-    auto img_dog = utils::load_image(img_dog_fn);
     auto img_cars = utils::load_image(img_cars_fn);
+    auto img_dog = utils::load_image(img_dog_fn);
 
     auto iteration_images = std::vector<std::vector<ov::Tensor>>{{img}, {img_cars}, {img_dog}};
     auto iteration_videos = std::vector<std::vector<ov::Tensor>>{{}, {}, {}};
     auto questions = std::vector<std::string>{"What is on the image?",
-                                              "How many cars in the second image? only answer fix digital in json format: for example {\"count\": 3}",
-                                              "How many images in total? only answer fix digital in json format: for example {\"count\": 3}"};
+                                              "How many cars in the second image? only answer fix digital in json format: for example {\"cars count\": 3}",
+                                              "Are there cars, dog, elephant in the images? only answer the question in json format: for example {\"cars\": \"yes\", \"dog\": \"no\", \"elephant\": \"no\"}"};
 
     std::cout << "== Start ov_pipe.generate:" << std::endl;
     for (size_t idx = 0; idx < iteration_images.size(); idx++)
