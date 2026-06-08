@@ -7,7 +7,8 @@
             "request": "launch",
             "program": "/home/xiping/mygithub/profiling_ov_genai/example_python/gemma4/example.py",
             "args": [
-                "--ov"
+                // "--ov"
+                "--torch-pipeline"
             ],
             "cwd": "/home/xiping/mygithub/profiling_ov_genai/example_python/gemma4",
             "python": "/home/xiping/mygithub/profiling_ov_genai/example_python/gemma4/python-env/bin/python",

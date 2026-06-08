@@ -342,7 +342,7 @@ def run_openvino():
     t1 = time.time()
     lm_infer_request.infer({
         "inputs_embeds": merged_embeds.astype(np.float32),
-        "attention_mask_4d": prefill_mask_4d,
+        "attention_mask": prefill_mask_4d,
         "position_ids": np.arange(seq_len, dtype=np.int64).reshape(1, -1),
     })
     logits = lm_infer_request.get_tensor("logits").data
@@ -367,7 +367,7 @@ def run_openvino():
 
         lm_infer_request.infer({
             "inputs_embeds": new_token_embed.astype(np.float32),
-            "attention_mask_4d": decode_mask_4d,
+            "attention_mask": decode_mask_4d,
             "position_ids": np.array([[current_pos]], dtype=np.int64),
         })
         logits = lm_infer_request.get_tensor("logits").data

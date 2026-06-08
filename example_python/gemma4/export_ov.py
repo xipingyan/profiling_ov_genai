@@ -178,7 +178,7 @@ class LanguageModelWrapper(nn.Module):
 class LanguageModelWithPastWrapper(nn.Module):
     """Wraps language_model + lm_head with KV cache and 4D attention mask (for stateful export).
 
-    attention_mask_4d: [batch, 1, q_len, kv_len] — supports bidirectional mask for vision tokens.
+    attention_mask: [batch, 1, q_len, kv_len] — supports bidirectional mask for vision tokens.
     During prefill: shape [1, 1, seq, seq] with bidirectional regions for vision.
     During decode: shape [1, 1, 1, past+1] — new token can attend to all past.
     """
@@ -190,14 +190,14 @@ class LanguageModelWithPastWrapper(nn.Module):
         self.num_layers = config.num_hidden_layers
         self.unique_layer_types = list(set(config.layer_types))
 
-    def forward(self, inputs_embeds, attention_mask_4d, position_ids, *past_kv_flat):
+    def forward(self, inputs_embeds, attention_mask, position_ids, *past_kv_flat):
         from transformers.cache_utils import DynamicCache
         past = DynamicCache(config=self.language_model.config)
         for i in range(self.num_layers):
             past.update(key_states=past_kv_flat[i * 2], value_states=past_kv_flat[i * 2 + 1], layer_idx=i)
 
         # Use same 4D mask for all layer types
-        causal_mask_mapping = {lt: attention_mask_4d for lt in self.unique_layer_types}
+        causal_mask_mapping = {lt: attention_mask for lt in self.unique_layer_types}
 
         out = self.language_model(
             inputs_embeds=inputs_embeds,
@@ -294,7 +294,7 @@ def export_lm_to_ov():
 
     # Name inputs/outputs
     ov_lm_model.inputs[0].set_names({"inputs_embeds"})
-    ov_lm_model.inputs[1].set_names({"attention_mask_4d"})
+    ov_lm_model.inputs[1].set_names({"attention_mask"})
     ov_lm_model.inputs[2].set_names({"position_ids"})
     for i in range(num_layers):
         ov_lm_model.inputs[3 + i * 2].set_names({f"past_key.{i}"})
