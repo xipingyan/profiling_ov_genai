@@ -25,6 +25,7 @@ processor = AutoProcessor.from_pretrained(MODEL_ID)
 
 # 2. 使用 PIL 打开你的本地图片
 image_path = "./cat_120_100.png"
+image_path = './GoldenGate.png'
 # image = Image.open(image_path).convert("RGB")
 
 # # 3. 【核心修改点】使用 Gemma 4 标准图像 Token: <|image|>
@@ -41,13 +42,17 @@ image_path = "./cat_120_100.png"
 messages = [
     {
         "role": "user", "content": [
-            # {"type": "image", "url": image_path},
-            {"type": "audio", "audio": "journal1.wav"},
-            {"type": "text", "text": "Transcribe the following speech segment."},
-            # {"type": "text", "text": "What is shown in this image?"},
+            {"type": "image", "url": image_path},
+            {"type": "text", "text": "What is shown in this image?"},
+            # {"type": "audio", "audio": "journal1.wav"},
+            # {"type": "text", "text": "Transcribe the following speech segment."},
         ]
     }
 ]
+# messages = [
+#     {"role": "system", "content": "You are a helpful assistant."},
+#     {"role": "user", "content": "Write a short joke about saving RAM."},
+# ]
 
 # Process input
 inputs = processor.apply_chat_template(
@@ -74,7 +79,7 @@ def run_torch():
 
     # 5. 生成推理
     print("开始生成回复（CPU 推理较慢，请耐心等待）...")
-    outputs = model.generate(**inputs, max_new_tokens=8)
+    outputs = model.generate(**inputs, max_new_tokens=8, do_sample=False)
 
     # 6. 解码并打印输出
     response = processor.decode(outputs[0][input_len:], skip_special_tokens=True)
@@ -141,12 +146,17 @@ def run_torch_pipeline():
 
     print(f"合并后 merged_embeds shape: {merged_embeds.shape}")
 
-    # Step 4: LM autoregressive generation (greedy, no KV cache for simplicity)
+    # Step 4: LM autoregressive generation (greedy, with bidirectional mask for vision)
     max_new_tokens = 8
     print(f"Step 4: LM 自回归生成 (max_new_tokens={max_new_tokens})...")
 
     seq_len = merged_embeds.shape[1]
     generated_token_ids = []
+
+    # Build bidirectional attention mask for vision tokens (same as model.model.forward)
+    from transformers.models.gemma4_unified.modeling_gemma4_unified import get_block_sequence_ids_for_mask
+    from transformers.masking_utils import create_masks_for_generate
+    block_sequence_ids = get_block_sequence_ids_for_mask(mm_token_type_ids, device="cpu")
 
     # Prefill
     t1 = time.time()
@@ -154,8 +164,18 @@ def run_torch_pipeline():
         merged_tensor = torch.from_numpy(merged_embeds).to(torch.bfloat16)
         attn_mask = torch.ones(1, seq_len, dtype=torch.long)
         pos_ids = torch.arange(seq_len).unsqueeze(0)
+
+        causal_mask_mapping = create_masks_for_generate(
+            config=model.config.get_text_config(),
+            inputs_embeds=merged_tensor,
+            attention_mask=attn_mask,
+            past_key_values=None,
+            position_ids=pos_ids,
+            block_sequence_ids=block_sequence_ids,
+        )
+
         lm_out = model.model.language_model(
-            inputs_embeds=merged_tensor, attention_mask=attn_mask,
+            inputs_embeds=merged_tensor, attention_mask=causal_mask_mapping,
             position_ids=pos_ids, use_cache=True,
         )
         logits = model.lm_head(lm_out.last_hidden_state).float()
@@ -177,8 +197,17 @@ def run_torch_pipeline():
             )
             attn_mask = torch.ones(1, current_pos + 1, dtype=torch.long)
             pos_ids_step = torch.tensor([[current_pos]])
+
+            causal_mask_mapping = create_masks_for_generate(
+                config=model.config.get_text_config(),
+                inputs_embeds=token_embed,
+                attention_mask=attn_mask,
+                past_key_values=past,
+                position_ids=pos_ids_step,
+            )
+
             lm_out = model.model.language_model(
-                inputs_embeds=token_embed, attention_mask=attn_mask,
+                inputs_embeds=token_embed, attention_mask=causal_mask_mapping,
                 position_ids=pos_ids_step, past_key_values=past, use_cache=True,
             )
             logits = model.lm_head(lm_out.last_hidden_state).float()
