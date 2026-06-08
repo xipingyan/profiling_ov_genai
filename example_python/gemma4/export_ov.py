@@ -176,23 +176,32 @@ class LanguageModelWrapper(nn.Module):
 
 
 class LanguageModelWithPastWrapper(nn.Module):
-    """Wraps language_model + lm_head with KV cache (for stateful export)."""
+    """Wraps language_model + lm_head with KV cache and 4D attention mask (for stateful export).
+
+    attention_mask_4d: [batch, 1, q_len, kv_len] — supports bidirectional mask for vision tokens.
+    During prefill: shape [1, 1, seq, seq] with bidirectional regions for vision.
+    During decode: shape [1, 1, 1, past+1] — new token can attend to all past.
+    """
 
     def __init__(self, language_model, lm_head, config):
         super().__init__()
         self.language_model = language_model
         self.lm_head = lm_head
         self.num_layers = config.num_hidden_layers
+        self.unique_layer_types = list(set(config.layer_types))
 
-    def forward(self, inputs_embeds, attention_mask, position_ids, *past_kv_flat):
+    def forward(self, inputs_embeds, attention_mask_4d, position_ids, *past_kv_flat):
         from transformers.cache_utils import DynamicCache
         past = DynamicCache(config=self.language_model.config)
         for i in range(self.num_layers):
             past.update(key_states=past_kv_flat[i * 2], value_states=past_kv_flat[i * 2 + 1], layer_idx=i)
 
+        # Use same 4D mask for all layer types
+        causal_mask_mapping = {lt: attention_mask_4d for lt in self.unique_layer_types}
+
         out = self.language_model(
             inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
+            attention_mask=causal_mask_mapping,
             position_ids=position_ids,
             past_key_values=past,
             use_cache=True,
@@ -254,11 +263,12 @@ def export_lm_to_ov():
     wrapper = LanguageModelWithPastWrapper(model.model.language_model, model.lm_head, config).float()
     wrapper.eval()
 
-    # Trace with non-zero past (decode mode)
+    # Trace with non-zero past (decode mode), using 4D attention mask
     past_len = 3
     seq_len = 1
     dummy_embeds = torch.randn(1, seq_len, 3840, dtype=torch.float32)
-    dummy_attn_mask = torch.ones(1, past_len + seq_len, dtype=torch.long)
+    # 4D mask: [batch=1, head=1, q_len=1, kv_len=past+1]
+    dummy_attn_mask_4d = torch.ones(1, 1, seq_len, past_len + seq_len, dtype=torch.float32)
     dummy_pos_ids = torch.tensor([[past_len]], dtype=torch.long)
 
     past_kv_flat = []
@@ -273,18 +283,18 @@ def export_lm_to_ov():
 
     print("== Testing wrapper forward...")
     with torch.no_grad():
-        outputs = wrapper(dummy_embeds, dummy_attn_mask, dummy_pos_ids, *past_kv_flat)
+        outputs = wrapper(dummy_embeds, dummy_attn_mask_4d, dummy_pos_ids, *past_kv_flat)
     print(f"  Logits shape: {outputs[0].shape}")
 
     print("== Converting language model to OV (this may take a while)...")
     ov_lm_model = ov.convert_model(
         wrapper,
-        example_input=(dummy_embeds, dummy_attn_mask, dummy_pos_ids, *past_kv_flat),
+        example_input=(dummy_embeds, dummy_attn_mask_4d, dummy_pos_ids, *past_kv_flat),
     )
 
     # Name inputs/outputs
     ov_lm_model.inputs[0].set_names({"inputs_embeds"})
-    ov_lm_model.inputs[1].set_names({"attention_mask"})
+    ov_lm_model.inputs[1].set_names({"attention_mask_4d"})
     ov_lm_model.inputs[2].set_names({"position_ids"})
     for i in range(num_layers):
         ov_lm_model.inputs[3 + i * 2].set_names({f"past_key.{i}"})

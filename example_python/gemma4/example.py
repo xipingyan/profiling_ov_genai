@@ -307,22 +307,42 @@ def run_openvino():
     # --- Step 4: Merge complete ---
     print(f"合并后 merged_embeds shape: {merged_embeds.shape}")
 
-    # --- Step 5: 自回归生成 (stateful LM, greedy) ---
+    # --- Step 5: 自回归生成 (stateful LM with 4D attention mask, greedy) ---
     max_new_tokens = 20
     print(f"开始自回归生成 (stateful, max_new_tokens={max_new_tokens})...")
 
-    # Initialize stateful LM: reset KV cache states
+    seq_len = merged_embeds.shape[1]
+
+    # Build 4D bidirectional attention mask for prefill:
+    # - Causal (lower triangular) for text tokens
+    # - Bidirectional within vision/audio token blocks
+    # mm_ids_np: 0=text, 1=image, 2=video, 3=audio
+    prefill_mask_4d = np.tril(np.ones((seq_len, seq_len), dtype=np.float32))  # causal base
+    # Make vision tokens (mm_ids==1) bidirectional within their block
+    vision_positions = np.where(mm_ids_np == 1)[0]
+    if len(vision_positions) > 0:
+        # Find contiguous blocks of vision tokens
+        breaks = np.where(np.diff(vision_positions) != 1)[0] + 1
+        blocks = np.split(vision_positions, breaks)
+        for block in blocks:
+            # Within this block, all tokens can attend to each other
+            for i in block:
+                for j in block:
+                    prefill_mask_4d[i, j] = 1.0
+    prefill_mask_4d = prefill_mask_4d.reshape(1, 1, seq_len, seq_len)
+    print(f"  Prefill 4D mask shape: {prefill_mask_4d.shape}")
+
+    # Initialize stateful LM
     lm_infer_request = compiled_lm.create_infer_request()
     lm_infer_request.reset_state()
 
-    seq_len = merged_embeds.shape[1]
     generated_token_ids = []
 
-    # Prefill: feed entire merged embeddings
+    # Prefill: feed entire merged embeddings with bidirectional mask
     t1 = time.time()
     lm_infer_request.infer({
         "inputs_embeds": merged_embeds.astype(np.float32),
-        "attention_mask": attention_mask if attention_mask is not None else np.ones((1, seq_len), dtype=np.int64),
+        "attention_mask_4d": prefill_mask_4d,
         "position_ids": np.arange(seq_len, dtype=np.int64).reshape(1, -1),
     })
     logits = lm_infer_request.get_tensor("logits").data
@@ -332,19 +352,22 @@ def run_openvino():
     print(f"  prefill: token_id={next_token_id}, 耗时: {(t2-t1)*1000:.0f} ms")
 
     # Decode: generate remaining tokens one by one
+    # Decode mask: [1, 1, 1, past+1] — new token can attend to all past tokens
     current_pos = seq_len
     for step in range(1, max_new_tokens):
         if next_token_id == 1:  # EOS
             break
 
         t1 = time.time()
-        # Get embedding for the last generated token
         next_ids = np.array([[next_token_id]], dtype=np.int64)
         new_token_embed = compiled_text_emb({"input_ids": next_ids})[compiled_text_emb.output(0)]
 
+        # Decode mask: new token attends to all past (causal, no bidirectional needed)
+        decode_mask_4d = np.ones((1, 1, 1, current_pos + 1), dtype=np.float32)
+
         lm_infer_request.infer({
             "inputs_embeds": new_token_embed.astype(np.float32),
-            "attention_mask": np.ones((1, current_pos + 1), dtype=np.int64),
+            "attention_mask_4d": decode_mask_4d,
             "position_ids": np.array([[current_pos]], dtype=np.int64),
         })
         logits = lm_infer_request.get_tensor("logits").data
