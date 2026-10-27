@@ -12,15 +12,27 @@ python3 -m venv python-env
 source python-env/bin/activate
 
 cd qwen3_omni_4B_final_release
+
+# 这2个install gpu不需要
 pip install -r requirements.txt
 pip install huggingface_hub
-pip install soundfile audioread av librosa torch torchvision 
+
+uv pip install soundfile audioread av librosa
+uv pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+uv pip install accelerate==1.6.0
 pip install ./transformers-internal-q3o-dense-3d1a4f5e34753e51cb85052539c6ef10cab9a5c1/
+```
+
+#### GPU
+
+更改模型路径和测试图片，音频，在run_qwen3_omni_dense.py 中。
+
+```
+python run_qwen3_omni_dense.py 
 ```
 
 #### CPU
 
-# MODEL_PATH = "/models/Qwen3-Omni-4B-Instruct-multilingual"
 For device cpu， please update codes of run_qwen3_omni_dense.py:
 
 ```
