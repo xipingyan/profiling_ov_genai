@@ -22,7 +22,7 @@ pip install -r requirements.txt
 
 #### Download model
 
-前往 Hugging Face 的 Comfy-Org/SeedVR2 仓库下载以下两个核心文件：
+前往 Hugging Face 的 Comfy-Org/SeedVR2 仓库下载以下两个核心文件：(https://huggingface.co/Comfy-Org/SeedVR2)
 
 DiT 主模型（INT8 量化版）：
 

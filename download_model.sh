@@ -29,8 +29,14 @@ model_id='/home/xiping/mygithub/modular_genai/openvino.mx/tests/test_models/qwen
 model_id='google/gemma-4-12B'
 
 # Refer: https://hf-mirror.com/
+# export HF_ENDPOINT=https://hf-mirror.com
+# hf download --token [token id] $model_id --local-dir ./models/$model_id
+
+# only download the specified model from the Hugging Face mirror
 export HF_ENDPOINT=https://hf-mirror.com
-hf download --token [your token] $model_id --local-dir ./models/$model_id
+hf download Comfy-Org/SeedVR2 vae/seedvr2_ema_vae_fp16.safetensors \
+  --token [token id] \
+  --local-dir ./models
 
 # compress to int4
 # optimum-cli export openvino --model $model_id --task image-text-to-text ov/qwen3-vl-2b-instruct_int4 --weight-format int4 --trust-remote-code

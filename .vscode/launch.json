@@ -248,6 +248,16 @@
             "cwd": "/mnt/data_nvme1n1p1/xiping_workpath/mygithub/profiling_qwen2b_vl_instruction/example_python"
         },
         {
+            "name": "sonomacreek_customer_qwen3_omni.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/mnt/data_nvme1n1p1/xiping_workpath/mygithub/profiling_ov_genai/example_python/qwen3_omni_4b/qwen3_omni_4B_final_release/run_qwen3_omni_dense.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "python": "/mnt/data_nvme1n1p1/xiping_workpath/mygithub/profiling_ov_genai/example_python/qwen3_omni_4b/python-env/bin/python",
+            "cwd": "/mnt/data_nvme1n1p1/xiping_workpath/mygithub/profiling_ov_genai/example_python/qwen3_omni_4b/qwen3_omni_4B_final_release"
+        },
+        {
             "name": "test_pipeline_genai",
             "type": "debugpy",
             "request": "launch",
